@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  ingestion:
+    build: 
+      context: ../src/ingestion
+      dockerfile: Dockerfile
+    container_name: ingestion-service
+    environment:
+      KAFKA_BROKER: kafka-1:19092
+    depends_on:
+      - kafka-1
+      - kafka-2
+    networks:
+      - streaming_network
+
+  processing:
+    build: 
+      context: ../src/processing
+      dockerfile: Dockerfile
+    container_name: processing-service
+    environment:
+      KAFKA_BROKERS: kafka-1:19092,kafka-2:19093
+      MONGO_URI: mongodb://mongo1:27017,mongo2:27018,mongo3:27019/?replicaSet=rs0
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - mongo-setup
+    networks:
+      - streaming_network
+
+  dashboard:
+    build: 
+      context: ../src/dashboard
+      dockerfile: Dockerfile
+    container_name: dashboard-service
+    ports:
+      - "8501:8501"
+    environment:
+      MONGO_URI: mongodb://mongo1:27017,mongo2:27018,mongo3:27019/?replicaSet=rs0
+    depends_on:
+      - mongo-setup
+    networks:
+      - streaming_network
+
+networks:
+  streaming_network:
+    name: streaming_network
+    external: true

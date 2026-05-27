@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  # Node 1: Sẽ đóng vai trò là Primary (Master) mặc định
+  mongo1:
+    image: mongo:6.0
+    container_name: mongo1
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27017"]
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: echo "ping" | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    networks:
+      - streaming_network
+
+  # Node 2: Đóng vai trò là Secondary (Bản sao 1)
+  mongo2:
+    image: mongo:6.0
+    container_name: mongo2
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27018"]
+    ports:
+      - "27018:27018"
+    networks:
+      - streaming_network
+
+  # Node 3: Đóng vai trò là Secondary (Bản sao 2 - Cần ít nhất 3 node để bầu cử Master khi có lỗi)
+  mongo3:
+    image: mongo:6.0
+    container_name: mongo3
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--port", "27019"]
+    ports:
+      - "27019:27019"
+    networks:
+      - streaming_network
+
+  # Container phụ: Chạy 1 lần duy nhất để liên kết 3 node trên thành 1 Cụm phân tán
+  mongo-setup:
+    image: mongo:6.0
+    container_name: mongo-setup
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      mongo2:
+        condition: service_started
+      mongo3:
+        condition: service_started
+    networks:
+      - streaming_network
+    command: >
+      mongosh --host mongo1:27017 --eval 
+      '
+      rs.initiate({
+        _id: "rs0",
+        members: [
+          { _id: 0, host: "mongo1:27017", priority: 2 },
+          { _id: 1, host: "mongo2:27018", priority: 1 },
+          { _id: 2, host: "mongo3:27019", priority: 1 }
+        ]
+      })
+      '
+
+networks:
+  streaming_network:
+    name: streaming_network
+    driver: bridge
