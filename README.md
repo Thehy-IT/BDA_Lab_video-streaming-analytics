@@ -110,12 +110,12 @@ docker-compose -f deployments/docker-compose.services.yml up -d --build
 
 *Lưu ý: Phương pháp này yêu cầu tầng Hạ tầng (Kafka & MongoDB) phải đang chạy và chung network `streaming_network`.*
 
+docker network create streaming_network
 
 docker-compose -f deployments/docker-compose.mongodb.yml -f deployments/docker-compose.kafka.yml -f deployments/docker-compose.services.yml up -d
 
----
 
-## 📂 Cấu trúc thư mục
+📂 Cấu trúc thư mục
 
 ```text
 .

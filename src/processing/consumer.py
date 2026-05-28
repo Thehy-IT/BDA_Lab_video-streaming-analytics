@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - [%
 # ─────────────────────────────────────────────
 KAFKA_BROKERS = os.getenv("KAFKA_BROKERS", "localhost:9092,localhost:9093").split(',')
 # Tạm thời để MongoDB là local, khi dựng file docker-compose MongoDB ta sẽ dùng URI của Replica Set sau
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0")
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017,127.0.0.1:27018,127.0.0.1:27019/?replicaSet=rs0")
 GROUP_ID = os.getenv("CONSUMER_GROUP_ID", "video-analytics-group")
 
 TOPICS = ["play_events", "quality_metrics", "user_actions"]
@@ -70,7 +70,7 @@ def main():
     
     # 1. Kết nối Lưu trữ phân tán (MongoDB)
     try:
-        mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=3000)
+        mongo_client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=10000)
         mongo_client.admin.command('ping') # Lệnh Ping kiểm tra kết nối
         db = mongo_client["video_analytics"]
         collection = db["streaming_metrics"]

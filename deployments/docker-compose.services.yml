@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ingestion:
     build: 
@@ -23,9 +21,12 @@ services:
       KAFKA_BROKERS: kafka-1:19092,kafka-2:19093
       MONGO_URI: mongodb://mongo1:27017,mongo2:27018,mongo3:27019/?replicaSet=rs0
     depends_on:
-      - kafka-1
-      - kafka-2
-      - mongo-setup
+      kafka-1:
+        condition: service_started
+      kafka-2:
+        condition: service_started
+      mongo-setup:
+        condition: service_completed_successfully
     networks:
       - streaming_network
 
@@ -39,7 +40,8 @@ services:
     environment:
       MONGO_URI: mongodb://mongo1:27017,mongo2:27018,mongo3:27019/?replicaSet=rs0
     depends_on:
-      - mongo-setup
+      mongo-setup:
+        condition: service_completed_successfully
     networks:
       - streaming_network
 

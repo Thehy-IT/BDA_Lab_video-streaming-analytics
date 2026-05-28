@@ -24,7 +24,7 @@ st.markdown("Hệ thống phân tán thu thập, xử lý và hiển thị thôn
 def get_database():
     # URI kết nối thẳng vào cụm Replica Set của MongoDB (3 node)
     mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
     return client["video_analytics"]["streaming_metrics"]
 
 collection = get_database()
