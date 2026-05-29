@@ -4,6 +4,7 @@ services:
       context: ../src/ingestion
       dockerfile: Dockerfile
     container_name: ingestion-service
+    restart: always
     environment:
       KAFKA_BROKER: kafka-1:19092
     depends_on:
@@ -17,6 +18,7 @@ services:
       context: ../src/processing
       dockerfile: Dockerfile
     container_name: processing-service
+    restart: always
     environment:
       KAFKA_BROKERS: kafka-1:19092,kafka-2:19093
       MONGO_URI: mongodb://mongo1:27017,mongo2:27018,mongo3:27019/?replicaSet=rs0

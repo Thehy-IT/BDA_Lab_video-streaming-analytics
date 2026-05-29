@@ -4,105 +4,127 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 from pymongo import MongoClient
+import logging
 
 # ─────────────────────────────────────────────
-# CẤU HÌNH GIAO DIỆN STREAMLIT
+# CONFIGURATION & LOGGING
 # ─────────────────────────────────────────────
+logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("Dashboard")
+
 st.set_page_config(
     page_title="Global Video Analytics",
     page_icon="📺",
     layout="wide"
 )
 
-st.title("📺 Trạm giám sát Video Streaming Toàn Cầu")
-st.markdown("Hệ thống phân tán thu thập, xử lý và hiển thị thông số lượng người xem theo thời gian thực.")
+# ─────────────────────────────────────────────
+# DATA ACCESS LAYER
+# ─────────────────────────────────────────────
+class DashboardDataService:
+    @staticmethod
+    @st.cache_resource
+    def get_database_collection():
+        """Establishes connection to the MongoDB Replica Set."""
+        mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0")
+        try:
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+            # Trigger a ping to verify connection
+            client.admin.command('ping')
+            return client["video_analytics"]["streaming_metrics"]
+        except Exception as e:
+            logger.error(f"Failed to connect to Storage Engine: {e}")
+            return None
+
+    @staticmethod
+    def fetch_recent_metrics(collection, limit: int = 30):
+        """Fetches the latest time-series metrics."""
+        if collection is None:
+            return None, None
+            
+        cursor = collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
+        data = list(cursor)
+        
+        if not data:
+            return None, None
+            
+        latest_doc = data[0]
+        # Reverse to chronological order for line charts
+        df = pd.DataFrame(data[::-1])
+        return df, latest_doc
 
 # ─────────────────────────────────────────────
-# KẾT NỐI DISTRIBUTED STORAGE (MONGODB REPLICA SET)
+# UI RENDERING LAYER
 # ─────────────────────────────────────────────
-@st.cache_resource
-def get_database():
-    # URI kết nối thẳng vào cụm Replica Set của MongoDB (3 node)
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=rs0")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
-    return client["video_analytics"]["streaming_metrics"]
+class DashboardUI:
+    @staticmethod
+    def render_header():
+        st.title("📺 Global Video Streaming Operations Center")
+        st.markdown("Real-time distributed system monitoring telemetry across global ingestion points.")
 
-collection = get_database()
-
-# ─────────────────────────────────────────────
-# HÀM LẤY VÀ XỬ LÝ DỮ LIỆU
-# ─────────────────────────────────────────────
-def fetch_data(limit=30):
-    """Lấy 30 bản ghi mới nhất từ MongoDB và chuyển thành DataFrame Pandas"""
-    # Lấy dữ liệu sắp xếp theo thời gian mới nhất (timestamp giảm dần)
-    cursor = collection.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
-    data = list(cursor)
-    
-    if len(data) == 0:
-        return None, None
-    
-    # Bản ghi mới nhất dùng cho các thẻ Thống kê (KPIs)
-    latest_doc = data[0]
-    
-    # Sắp xếp lại dataframe theo chiều thời gian tăng dần để vẽ biểu đồ line
-    df = pd.DataFrame(data[::-1]) 
-    return df, latest_doc
-
-# ─────────────────────────────────────────────
-# VẼ GIAO DIỆN (DASHBOARD LAYOUT)
-# ─────────────────────────────────────────────
-# Vùng chứa Placeholder để có thể tự động refresh nội dung
-dashboard_placeholder = st.empty()
-
-with dashboard_placeholder.container():
-    df, latest = fetch_data()
-
-    if df is None:
-        st.warning("⏳ Đang chờ dữ liệu gửi về từ Processing Nodes... Hãy chắc chắn Producer và Consumer đang chạy.")
-    else:
-        # 1. Thẻ KPIs (Chỉ số tổng quan)
+    @staticmethod
+    def render_kpis(latest_data: dict):
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric(label="Lưu lượng Events/batch", value=latest.get("total_events_processed", 0))
+            st.metric(label="Events Processed (Last Batch)", value=latest_data.get("total_events_processed", 0))
         with col2:
-            st.metric(label="Bitrate trung bình (kbps)", value=f"{latest.get('avg_bitrate_kbps', 0)} kbps")
+            st.metric(label="Global Avg Bitrate (kbps)", value=f"{latest_data.get('avg_bitrate_kbps', 0):.0f} kbps")
         with col3:
-            # Nếu tỷ lệ buffer (lag) lớn hơn 5% thì hiện màu đỏ cảnh báo
-            buffer_pct = latest.get('avg_buffer_ratio', 0) * 100
-            st.metric(label="Tỷ lệ Giật/Lag trung bình", value=f"{buffer_pct:.2f} %")
-
+            buffer_pct = latest_data.get('avg_buffer_ratio', 0) * 100
+            st.metric(label="Global Buffer Ratio (Lag)", value=f"{buffer_pct:.2f} %")
         st.markdown("---")
 
-        # 2. Hàng Biểu đồ thứ nhất
+    @staticmethod
+    def render_charts(df: pd.DataFrame, latest_data: dict):
         row1_col1, row1_col2 = st.columns(2)
 
         with row1_col1:
-            st.subheader("Bản đồ phân bổ người xem")
-            regions_data = latest.get("region_counts", {})
+            st.subheader("Audience Geographic Distribution")
+            regions_data = latest_data.get("region_counts", {})
             if regions_data:
-                df_regions = pd.DataFrame(list(regions_data.items()), columns=["Khu vực", "Số lượng"])
-                fig_pie = px.pie(df_regions, names="Khu vực", values="Số lượng", hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
+                df_regions = pd.DataFrame(list(regions_data.items()), columns=["Region", "Count"])
+                fig_pie = px.pie(df_regions, names="Region", values="Count", hole=0.4, color_discrete_sequence=px.colors.sequential.Teal)
                 st.plotly_chart(fig_pie, use_container_width=True)
 
         with row1_col2:
-            st.subheader("Cảnh báo Video giật lag (Top Buffer)")
-            lagging = latest.get("lagging_videos", {})
+            st.subheader("Network Anomalies (Top Lagging Videos)")
+            lagging = latest_data.get("lagging_videos", {})
             if lagging:
-                df_lag = pd.DataFrame(list(lagging.items()), columns=["Video ID", "Số lần gặp lỗi Buffer"]).sort_values(by="Số lần gặp lỗi Buffer", ascending=False)
-                fig_bar = px.bar(df_lag.head(5), x="Video ID", y="Số lần gặp lỗi Buffer", color="Số lần gặp lỗi Buffer", color_continuous_scale="Reds")
+                df_lag = pd.DataFrame(list(lagging.items()), columns=["Video ID", "Buffer Incidents"]).sort_values(by="Buffer Incidents", ascending=False)
+                fig_bar = px.bar(df_lag.head(5), x="Video ID", y="Buffer Incidents", color="Buffer Incidents", color_continuous_scale="Reds")
                 st.plotly_chart(fig_bar, use_container_width=True)
             else:
-                st.success("Hệ thống mạng ổn định, không có video nào bị lag!")
+                st.success("Global network is stable. No severe buffering detected.")
 
         st.markdown("---")
 
-        # 3. Hàng Biểu đồ thứ hai (Timeline)
-        st.subheader("Biến động chất lượng mạng (Real-time Timeline)")
-        fig_line = px.line(df, x="timestamp", y=["avg_bitrate_kbps"], markers=True, title="Bitrate tổng toàn cầu theo thời gian")
+        st.subheader("Real-time Global Bitrate Timeline")
+        fig_line = px.line(df, x="timestamp", y=["avg_bitrate_kbps"], markers=True, title="Average Bitrate over Time")
         st.plotly_chart(fig_line, use_container_width=True)
 
 # ─────────────────────────────────────────────
-# TỰ ĐỘNG REFRESH SAU MỖI 2 GIÂY
+# MAIN APPLICATION LOOP
 # ─────────────────────────────────────────────
-time.sleep(2)
-st.rerun()
+def main():
+    DashboardUI.render_header()
+    
+    collection = DashboardDataService.get_database_collection()
+    
+    # Placeholder for live refresh
+    placeholder = st.empty()
+    
+    with placeholder.container():
+        df, latest = DashboardDataService.fetch_recent_metrics(collection)
+        
+        if df is None:
+            st.warning("⏳ Awaiting data from Processing Nodes... Ensure Kafka Brokers and Zookeeper are active.")
+        else:
+            DashboardUI.render_kpis(latest)
+            DashboardUI.render_charts(df, latest)
+
+    # Polling Mechanism (Every 2 seconds)
+    time.sleep(2)
+    st.rerun()
+
+if __name__ == "__main__":
+    main()

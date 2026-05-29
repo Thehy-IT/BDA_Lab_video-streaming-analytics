@@ -1,143 +1,100 @@
-# 📺 Global Video Streaming Analytics (Distributed System Demo)
+# 📺 Nền tảng Phân tích Luồng Video Toàn cầu
 
-Dự án Xây dựng hệ thống phân tán (Distributed System) để thu thập, xử lý và trực quan hóa dữ liệu người xem video toàn cầu theo thời gian thực. Hệ thống mô phỏng luồng dữ liệu lớn (Big Data) với khả năng chịu lỗi và mở rộng cao.
+Một đường ống dữ liệu phân tán, có khả năng chịu lỗi và thời gian thực được thiết kế để thu thập, xử lý và trực quan hóa dữ liệu đo từ xa (telemetry) từ các ứng dụng xem video trên toàn cầu. Hệ thống này thể hiện các nguyên tắc cốt lõi của kỹ thuật Dữ liệu lớn (Big Data), bao gồm khả năng mở rộng theo chiều ngang, tính khả dụng cao và xử lý luồng dữ liệu bền bỉ.
 
-## 🏗️ Kiến trúc Hệ thống (System Architecture)
+## 🏗️ Kiến trúc Hệ thống
 
-Hệ thống được thiết kế theo mô hình Pipeline dữ liệu gồm 4 tầng chính:
+Nền tảng được xây dựng dựa trên kiến trúc microservices hướng sự kiện, được tách biệt thành bốn lớp riêng biệt:
 
-1. **Data Ingestion (Tầng Thu thập):**
+1. **Lớp Thu thập Dữ liệu (Mô phỏng Edge/Client)**
+   * **Thành phần:** Trình tạo dữ liệu đo từ xa (Telemetry Producer) dựa trên Python.
+   * **Vai trò:** Mô phỏng các sự kiện khách hàng đồng thời với thông lượng cao (trạng thái phát lại, số liệu đệm, điều chỉnh bitrate) bắt nguồn từ các thiết bị biên toàn cầu.
+   * **Định tuyến:** Các sự kiện được tuần tự hóa và phân vùng một cách xác định vào các chủ đề (topics) Kafka (`play_events`, `quality_metrics`, `user_actions`) để tối ưu hóa việc tiêu thụ dữ liệu ở hạ nguồn.
 
-   * **Component:** Python Producer.
-   * **Chức năng:** Giả lập hàng nghìn người xem video, sinh ra các sự kiện (play, pause, buffer, bitrate change) và gửi vào cụm Kafka.
-   * **Phân phối:** Dữ liệu được định tuyến vào các Topic khác nhau (`play_events`, `quality_metrics`, `user_actions`) dựa trên loại sự kiện.
-2. **Message Broker (Hệ thống Hàng đợi):**
+2. **Môi giới Thông điệp / Tổng hợp Nhật ký (Log Aggregation)**
+   * **Thành phần:** Cụm Apache Kafka (với Zookeeper).
+   * **Vai trò:** Đóng vai trò là hệ thần kinh trung ương. Cung cấp nhật ký cam kết (commit logs) phân tán, bền bỉ và được phân vùng.
+   * **Khả năng phục hồi:** Được cấu hình với Hệ số nhân bản (Replication Factor) = 2. Đảm bảo không mất dữ liệu và duy trì tính khả dụng liên tục ngay cả khi có sự cố phân vùng môi giới hoặc lỗi phần cứng.
 
-   * **Component:** Apache Kafka Cluster (2 Brokers).
-   * **Chức năng:** Lưu trữ trung gian dữ liệu với cơ chế Replication Factor = 2, đảm bảo dữ liệu không bị mất ngay cả khi một Broker gặp sự cố.
-   * **Quản lý:** Kafka UI (Port 8080) giúp theo dõi luồng dữ liệu trực quan.
-3. **Stream Processing (Tầng Xử lý):**
+3. **Lớp Xử lý Luồng (Stream Processing Layer)**
+   * **Thành phần:** Các trình tiêu thụ Kafka (Kafka Consumers) dựa trên Python.
+   * **Vai trò:** Thực hiện xử lý vi đợt (micro-batch) gần thời gian thực (NRT) (cửa sổ tumbling 5 giây). Tổng hợp dữ liệu thô thành các chỉ số có thể hành động (ví dụ: Bitrate trung bình, Tỷ lệ đệm, Tỷ lệ lỗi).
+   * **Khả năng mở rộng:** Thiết kế phi trạng thái (stateless) cho phép mở rộng theo chiều ngang. Các trình tiêu thụ trong cùng một `group_id` sẽ tự động cân bằng lại các phân vùng, cung cấp khả năng phân phối tải động và chuyển đổi dự phòng tức thì.
 
-   * **Component:** Python Consumer (Micro-batching).
-   * **Chức năng:** Tiêu thụ dữ liệu từ Kafka, gom nhóm (batching) mỗi 5 giây để tính toán các chỉ số: Tổng số event, Bitrate trung bình, Tỷ lệ giật lag (buffer), Top video bị lỗi.
-   * **Mở rộng:** Có thể chạy nhiều Consumer Node trong cùng một `group_id` để chia sẻ tải (Load Balancing).
-4. **Distributed Storage & Visualization (Lưu trữ & Trực quan hóa):**
-
-   * **Storage:** MongoDB Replica Set (3 Nodes). Đảm bảo tính sẵn sàng cao (High Availability), tự động bầu chọn Master mới nếu có lỗi.
-   * **Dashboard:** Streamlit + Plotly. Cập nhật biểu đồ thời gian thực từ dữ liệu đã xử lý trong MongoDB.
-
----
-
-## 🛠️ Công nghệ sử dụng (Tech Stack)
-
-* **Ngôn ngữ:** Python (Kafka-python, Pymongo, Pandas).
-* **Infrastructure:** Docker & Docker Compose.
-* **Message Broker:** Apache Kafka & Zookeeper.
-* **Database:** MongoDB (Replica Set).
-* **Visualization:** Streamlit, Plotly.
+4. **Lớp Lưu trữ Phân tán & Trực quan hóa**
+   * **Lưu trữ:** Bộ bản sao MongoDB (1 Chính, 2 Phụ). Cung cấp Tính khả dụng cao (HA) thông qua việc tự động chuyển đổi dự phòng/bầu chọn, đảm bảo lưu trữ mạnh mẽ cho các chỉ số tổng hợp.
+   * **Trực quan hóa:** Streamlit + Plotly. Một bảng điều khiển hoạt động tương tác truy vấn lớp lưu trữ để hiển thị thông tin chi tiết theo thời gian thực.
 
 ---
 
-## 🚀 Hướng dẫn chạy hệ thống (Local)
+## 🛠️ Công nghệ Sử dụng (Stack)
 
-### 1. Chuẩn bị môi trường
+* **Ngôn ngữ lập trình:** Python 3.9+ (kafka-python, pymongo, pandas)
+* **Cơ sở hạ tầng & Container hóa:** Docker, Docker Compose
+* **Truyền luồng sự kiện:** Apache Kafka, Apache Zookeeper
+* **Cơ sở dữ liệu phân tán:** MongoDB (Chế độ Replica Set)
+* **Frontend/Dashboard:** Streamlit, Plotly
 
-* Cài đặt [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-* Cài đặt Python 3.9+ (nếu muốn chạy các dịch vụ bên ngoài Docker).
+---
 
-### 2. Thiết lập cấu hình
+## 🚀 Hướng dẫn Phát triển Cục bộ (Máy đơn)
 
-Sao chép file cấu hình mẫu và chỉnh sửa nếu cần:
+Phần này hướng dẫn triển khai toàn bộ hệ thống trên một máy phát triển cục bộ duy nhất. Để triển khai cụm phân tán đa nút (4 máy), vui lòng tham khảo [Sổ tay triển khai cụm phân tán](step-to-step.md).
 
+### 1. Điều kiện tiên quyết
+* Đã cài đặt và đang chạy [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+* Git để quản lý phiên bản.
+* (Tùy chọn) Python 3.9+ nếu bạn muốn chạy các dịch vụ trực tiếp bên ngoài container.
+
+### 2. Cấu hình Môi trường
+Sao chép kho lưu trữ và khởi tạo cấu hình môi trường:
 ```bash
+git clone <repository_url>
+cd BDA_Lab_video-streaming-analytics
 cp .env.example .env
 ```
+*(Tệp `.env.example` mặc định đã được cấu hình sẵn để thực thi trên `localhost`).*
 
-### 3. Khởi động hạ tầng (Infrastructure)
+### 3. Khởi động nhanh (Tự động)
+Chúng tôi đã cung cấp các tệp lệnh tiện ích để điều phối toàn bộ nền tảng chỉ bằng một lệnh duy nhất.
 
-Mở terminal và chạy các cụm phân tán:
-
-**Bước A: Chạy Kafka Cluster**
-
-```bash
-docker-compose -f deployments/docker-compose.kafka.yml up -d
+**Dành cho Windows:**
+```cmd
+.\scripts\start_all.bat
 ```
 
-*Kiểm tra Kafka UI tại: http://localhost:8080*
-
-**Bước B: Chạy MongoDB Replica Set**
-
+**Dành cho Linux/Mac:**
 ```bash
-docker-compose -f deployments/docker-compose.mongodb.yml up -d
+chmod +x scripts/start_all.sh
+./scripts/start_all.sh
 ```
+*Tệp lệnh này tự động thiết lập mạng Docker, khởi tạo hạ tầng Kafka và MongoDB, và khởi chạy các dịch vụ ứng dụng.*
 
-*Lưu ý: Đợi khoảng 10-20 giây để container `mongo-setup` hoàn tất việc cấu hình Replica Set.*
+### 4. Xác minh Dịch vụ
+Sau khi cụm đã hoạt động, hãy truy cập các giao diện sau:
+* **Bảng điều khiển hoạt động:** [http://localhost:8501](http://localhost:8501)
+* **Giao diện quản lý Kafka (Theo dõi cụm):** [http://localhost:8080](http://localhost:8080)
 
-### 4. Chạy các dịch vụ (Services)
+### 5. Dừng hệ thống
+Để dừng cụm một cách an toàn và loại bỏ các container/mạng liên quan:
+**Windows:** `.\scripts\stop_all.bat`
+**Linux/Mac:** `./scripts/stop_all.sh`
 
-Bạn có thể chạy trực tiếp bằng Python hoặc dùng Docker.
+---
 
-#### Cách 1: Chạy bằng Python (Khuyên dùng khi Dev)
-
-Mở 3 terminal riêng biệt:
-
-* **Terminal 1 (Ingestion):**
-  ```bash
-  cd src/ingestion
-  pip install -r requirements.txt
-  python producer.py
-  ```
-* **Terminal 2 (Processing):**
-  ```bash
-  cd src/processing
-  pip install -r requirements.txt
-  python consumer.py
-  ```
-* **Terminal 3 (Dashboard):**
-  ```bash
-  cd src/dashboard
-  pip install -r requirements.txt
-  streamlit run app.py
-  ```
-
-#### Cách 2: Chạy toàn bộ bằng Docker (Production mode)
-
-Hệ thống đã có sẵn cấu hình Docker Compose để chạy các dịch vụ:
-
-```bash
-docker-compose -f deployments/docker-compose.services.yml up -d --build
-```
-
-*Lưu ý: Phương pháp này yêu cầu tầng Hạ tầng (Kafka & MongoDB) phải đang chạy và chung network `streaming_network`.*
-
-docker network create streaming_network
-
-docker-compose -f deployments/docker-compose.mongodb.yml -f deployments/docker-compose.kafka.yml -f deployments/docker-compose.services.yml up -d
-
-
-📂 Cấu trúc thư mục
+## 📂 Cấu trúc Dự án
 
 ```text
 .
-├── deployments/            # File cấu hình Docker (Kafka, MongoDB)
-├── docs/                   # Tài liệu hướng dẫn và sơ đồ kiến trúc
-├── src/
-│   ├── ingestion/          # Source code Producer (Đẩy dữ liệu)
-│   ├── processing/         # Source code Consumer (Xử lý dữ liệu)
-│   └── dashboard/          # Giao diện hiển thị (Streamlit)
-├── .env.example            # File mẫu cấu hình biến môi trường
-└── README.md               # Tài liệu dự án
+├── deployments/         # Hạ tầng dưới dạng mã (Docker Compose cho Kafka, MongoDB, Dịch vụ)
+├── docs/                # Sơ đồ kiến trúc và tài liệu kỹ thuật
+├── scripts/             # Các tệp lệnh tự động hóa cho Trải nghiệm Nhà phát triển (DX)
+├── src/                 # Mã nguồn ứng dụng
+│   ├── ingestion/       # Trình tạo dữ liệu đo từ xa
+│   ├── processing/      # Công cụ xử lý luồng
+│   └── dashboard/       # Giao diện trực quan hóa thời gian thực
+├── tests/               # Bộ kiểm thử tự động (Unit/Integration)
+├── .env.example         # Mẫu biến môi trường
+├── step-to-step.md      # Sổ tay triển khai cụm phân tán
+└── README.md            # Tổng quan dự án (Tệp này)
 ```
-
-## 🛡️ Tính năng nổi bật
-
-* **Fault Tolerance:** Hệ thống vẫn hoạt động bình thường nếu 1 Kafka Broker hoặc 1 MongoDB Node bị sập.
-* **Scalability:** Có thể dễ dàng tăng số lượng Consumer để xử lý lượng dữ liệu lớn hơn.
-* **Real-time:** Độ trễ (Latency) thấp, dữ liệu được cập nhật lên Dashboard sau mỗi 5 giây.
-
-## 👥 Nhóm thực hiện
-
-* **Thành viên 1:** [Tên] - [MSSV]
-* **Thành viên 2:** [Tên] - [MSSV]
-* **Thành viên 3:** [Tên] - [MSSV]
-* **Thành viên 4:** [Tên] - [MSSV]
