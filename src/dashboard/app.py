@@ -59,7 +59,7 @@ class DashboardDataService:
 class DashboardUI:
     @staticmethod
     def render_header():
-        st.title("📺 Global Video Streaming Operations Center")
+        st.title("Global Video Streaming Operations Center")
         st.markdown("Real-time distributed system monitoring telemetry across global ingestion points.")
 
     @staticmethod
@@ -117,7 +117,7 @@ def main():
         df, latest = DashboardDataService.fetch_recent_metrics(collection)
         
         if df is None:
-            st.warning("⏳ Awaiting data from Processing Nodes... Ensure Kafka Brokers and Zookeeper are active.")
+            st.warning("Awaiting data from Processing Nodes... Ensure Kafka Brokers and Zookeeper are active.")
         else:
             DashboardUI.render_kpis(latest)
             DashboardUI.render_charts(df, latest)
