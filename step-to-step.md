@@ -1,117 +1,137 @@
-# 📖 Sổ tay Triển khai Cụm Phân tán (Cấu trúc 4 nút)
+# 🚀 Sổ tay "Chiến Game" Video Streaming Analytics (Team HY & Anh Em)
 
-Tài liệu này cung cấp hướng dẫn toàn diện để triển khai **Nền tảng Phân tích Luồng Video** trên một mạng vật lý phân tán (4 máy riêng biệt). Cấu trúc này mô phỏng môi trường sản xuất thực tế, đảm bảo giao tiếp mạng mạnh mẽ, cân bằng tải và khả năng chịu lỗi.
-
-## 🏗️ Cấu trúc Cụm Vật lý
-
-Chúng tôi sẽ phân phối khối lượng công việc trên 4 nút vật lý (Laptop/PC) như sau:
-
-* **Nút 1 (192.168.1.101):** Môi giới Thông điệp (Kafka Cluster & Zookeeper) + Thu thập Dữ liệu (Producer).
-* **Nút 2 (192.168.1.102):** Công nhân Xử lý Luồng 1 (Consumer).
-* **Nút 3 (192.168.1.103):** Công cụ Lưu trữ (MongoDB Replica Set) + Công nhân Xử lý Luồng 2 (Consumer).
-* **Nút 4 (192.168.1.104):** Lớp Hiển thị (Dashboard).
+Để cái Lab này chạy mượt, không ông nào bị "xì khói" máy, anh em mình làm theo đúng hướng dẫn này nhé. Tài liệu này viết cho dân mình nên cực kỳ dễ hiểu, cứ thế mà triển!
 
 ---
 
-## ⚙️ Giai đoạn 1: Cấu hình Mạng & Bảo mật (Điều kiện tiên quyết)
+## 🏗️ 1. Sơ đồ tác chiến (Ai làm việc nấy)
 
-Khả năng hiển thị mạng là rất quan trọng đối với một hệ thống phân tán. Thực hiện các bước sau trên **CẢ 4 NÚT**:
+Team mình có 4 Nút (Node), tui chia việc cho **Thuận, Dương, Rùa** như sau:
 
-1. **Mạng Thống nhất:** Đảm bảo tất cả 4 nút được kết nối với cùng một mạng cục bộ (LAN), chẳng hạn như bộ định tuyến Wi-Fi chuyên dụng hoặc Điểm phát sóng di động.
-2. **Quy tắc Tường lửa:** 
-   * Trên Windows: Đi tới *Windows Defender Firewall -> Turn off Windows Defender Firewall* cho cả mạng Private và Public. Ngoài ra, hãy thêm các quy tắc inbound/outbound cho phép các cổng `9092, 9093, 27017-27019, 8501` một cách rõ ràng.
-   * Trên Linux/Mac: Điều chỉnh `ufw` hoặc `pf` tương ứng.
-3. **Tìm địa chỉ IP:** Chạy `ipconfig` (Windows) hoặc `ifconfig` (Linux/Mac) trên mỗi máy để xác định địa chỉ IPv4 của chúng. 
-   *(Lưu ý: Các IP được liệt kê trong cấu trúc trên chỉ là ví dụ. Vui lòng thay thế chúng bằng IP thực tế của bạn).*
+| Thành viên      | Vị trí (Node)  | IP                | Cần cài      | Nhiệm vụ chính                              |
+| :---------------- | :--------------- | :---------------- | :------------- | :--------------------------------------------- |
+| **Thuận**  | **Nút 1** | `192.168.1.12`  | Docker, Python | "Đầu não" Kafka & "Máy phát" Producer     |
+| **Dương** | **Nút 2** | `192.168.1.102` | Python         | "Máy lọc 1" Consumer 1                       |
+| **Rùa**    | **Nút 3** | `192.168.1.6`   | Docker, Pthon  | "Kho chứa" MongoDB & "Máy lọc 2" Consumer 2 |
+| **HY**      | **Nút 4** | `192.168.1.104` | Python         | "Bảng tin" Dashboard (Streamlit)              |
 
----
+## ⚙️ 2. Giai đoạn "Khởi động" (Tất cả phải làm)
 
-## 🛠️ Giai đoạn 2: Cung cấp Môi trường
+Trước khi bấm nút, 3 ông làm ngay cho tui mấy việc "thủ tục" này:
 
-1. **Phân phối Mã nguồn:** Đảm bảo mã nguồn giống hệt nhau được sao chép trên cả 4 nút.
-2. **Cấu hình Kafka Listeners (CHỈ trên Nút 1):**
-   * Chỉnh sửa `deployments/docker-compose.kafka.yml` trên Nút 1.
-   * Ràng buộc các Kafka advertised listeners với địa chỉ IP vật lý của Nút 1 (không sử dụng `localhost`).
-   ```yaml
-   # Dưới dịch vụ kafka-1:
-   KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.1.101:9092,INTERNAL://kafka-1:19092
-   
-   # Dưới dịch vụ kafka-2:
-   KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://192.168.1.101:9093,INTERNAL://kafka-2:19093
-   ```
-3. **Cấu hình Biến Môi trường (Trên CẢ 4 NÚT):**
-   * Sao chép `.env.example` thành `.env`.
-   * Cập nhật các điểm cuối để định tuyến lưu lượng truy cập rõ ràng đến Nút 1 (Kafka) và Nút 3 (MongoDB).
-   ```ini
-   # Trỏ đến Nút 1 (Kafka Broker)
-   KAFKA_BROKER=192.168.1.101:9092
-   KAFKA_BROKERS=192.168.1.101:9092,192.168.1.101:9093
-
-   # Trỏ đến Nút 3 (MongoDB Replica Set)
-   MONGO_URI=mongodb://192.168.1.103:27017,192.168.1.103:27018,192.168.1.103:27019/?replicaSet=rs0
-   ```
+1. **Dùng chung 1 Wi-Fi:** Tất cả kết nối vào cùng 1 mạng (tốt nhất là phát từ điện thoại cho ổn định).
+2. **Tắt Firewall:** Windows Firewall là "kẻ thù" của kết nối mạng. Vào *Firewall* chọn *Turn off* hết đi (xong Lab nhớ bật lại không dính virus tui không chịu trách nhiệm đâu nha).
+3. **Check IP:** Mở CMD gõ `ipconfig`. Lấy cái `IPv4 Address`. Ông nào IP khác bảng trên thì hú lên để cả team cùng sửa.
 
 ---
 
-## 🚀 Giai đoạn 3: Điều phối Dịch vụ & Trình tự Khởi động
+## 🛠️ 3. Giai đoạn "Đổ xăng" (Cấu hình .env)
 
-Để ngăn chặn tình trạng tranh chấp kết nối, hệ thống phải được khởi động theo trình tự rõ ràng sau:
+Cả team copy file `.env.example` thành `.env`. Sau đó sửa nội dung theo đúng IP máy của **Thuận** và **Rùa**:
 
-### Bước 3.1: Khởi tạo Công cụ Lưu trữ (Nút 3)
-* Thực thi trên **Nút 3**:
-  ```bash
-  docker-compose -f deployments/docker-compose.mongodb.yml up -d
-  ```
-* *Đợi 15-20 giây để quá trình bầu chọn Replica Set hoàn tất và nút Chính (Primary) được thiết lập.*
+```ini
+# Trỏ về máy của Thuận (Kafka)
+KAFKA_BROKER=192.168.1.101:9092
 
-### Bước 3.2: Khởi tạo Môi giới Thông điệp (Nút 1)
-* Thực thi trên **Nút 1**:
-  ```bash
-  docker-compose -f deployments/docker-compose.kafka.yml up -d
-  ```
-* *Khung xương hạ tầng phân tán hiện đã sẵn sàng hoạt động.*
-
-### Bước 3.3: Triển khai các Công nhân Xử lý Luồng (Nút 2 & 3)
-Chúng tôi chạy công cụ Xử lý trực tiếp qua Python để thể hiện nhật ký công nhân phân tán.
-* Thực thi trên **Nút 2**:
-  ```bash
-  cd src/processing && pip install -r requirements.txt && python consumer.py
-  ```
-* Thực thi trên **Nút 3** (Cửa sổ dòng lệnh thứ hai):
-  ```bash
-  cd src/processing && pip install -r requirements.txt && python consumer.py
-  ```
-* *Nhật ký sẽ cho biết các công nhân đang chờ dữ liệu.*
-
-### Bước 3.4: Triển khai Lớp Hiển thị (Nút 4)
-* Thực thi trên **Nút 4** (Máy hiển thị):
-  ```bash
-  cd src/dashboard && pip install -r requirements.txt && streamlit run app.py
-  ```
-* *Giao diện bảng điều khiển sẽ tải, hiển thị trạng thái chờ.*
-
-### Bước 3.5: Kích hoạt Thu thập Dữ liệu (Nút 1)
-* Thực thi trên **Nút 1** (Cửa sổ dòng lệnh thứ hai):
-  ```bash
-  cd src/ingestion && pip install -r requirements.txt && python producer.py
-  ```
-* **Tiêu chí thành công:** Dữ liệu đo từ xa ngay lập tức chảy qua môi giới Kafka đến các công nhân phân tán trên Nút 2 & 3. Các chỉ số đã xử lý được lưu trữ bền bỉ trong MongoDB của Nút 3 và bảng điều khiển của Nút 4 trực quan hóa các phân tích trong thời gian thực.
+# Trỏ về máy của Rùa (Mongo)
+MONGO_URI=mongodb://192.168.1.103:27017,192.168.1.103:27018,192.168.1.103:27019/?replicaSet=rs0
+```
 
 ---
 
-## 🛡️ Giai đoạn 4: Thử nghiệm Khả năng chịu lỗi (Chaos Engineering)
+## 🚀 4. Giai đoạn "Lên sàn" (Thứ tự cực kỳ quan trọng!)
 
-Khi hệ thống đang xử lý dữ liệu với thông lượng cao nhất, bạn có thể thực hiện các thử nghiệm sau để xác nhận khả năng phục hồi của hệ thống.
+Làm sai thứ tự là nó lỗi "lên bờ xuống ruộng" đó. Anh em cứ thong thả, ông trước xong thì ông sau mới làm.
 
-### Kịch bản A: Chuyển đổi dự phòng Công nhân (Tái cân bằng tải)
-1. **Hành động:** Trên Nút 2, dừng đột ngột tiến trình `consumer.py` đang chạy (Ctrl+C).
-2. **Quan sát:** Đường ống xử lý không bị dừng lại.
-3. **Giải thích kỹ thuật:** Giao thức Kafka Consumer Group phát hiện sự cố nhịp tim (heartbeat) của Nút 2. Nó tự động kích hoạt việc tái cân bằng phân vùng, gán lại khối lượng công việc của Nút 2 cho công nhân còn lại trên Nút 3. Không có dữ liệu nào bị mất.
+### Bước 1: Rùa dựng "Kho hàng" (Nút 3)
 
-### Kịch bản B: Tính khả dụng cao của Cơ sở dữ liệu (Bầu chọn Replica Set)
-1. **Hành động:** Trên Nút 3, buộc dừng container MongoDB Chính:
-   ```bash
-   docker stop mongo1
-   ```
-2. **Quan sát:** Các công nhân xử lý luồng có thể ghi nhật ký lỗi hết thời gian kết nối tạm thời trong khoảng 3-5 giây. Ngay sau đó, quá trình xử lý chỉ số và cập nhật bảng điều khiển sẽ tiếp tục mượt mà.
-3. **Giải thích kỹ thuật:** MongoDB Replica Set phát hiện việc mất `mongo1`. Một cuộc bầu chọn nhanh chóng diễn ra giữa các nút còn lại (`mongo2` và `mongo3`), thăng cấp một nút Chính mới. Logic của trình điều khiển cơ sở dữ liệu sẽ tự động kết nối lại với nút Chính mới, đảm bảo các hoạt động ghi liên tục.
+**Rùa** mở terminal tại thư mục gốc:
+
+```bash
+docker-compose -f deployments/docker-compose.mongodb.yml up -d
+```
+
+*Hóng khoảng 30s cho Database nó tự bầu "Sếp" (Primary) xong đã nhé.*
+
+### Bước 2: Thuận dựng "Trạm trung chuyển" (Nút 1)
+
+**Thuận** check lại file `deployments/docker-compose.kafka.yml`, chỗ nào có IP thì sửa thành IP máy ông. Xong rồi quất:
+
+```bash
+docker-compose -f deployments/docker-compose.kafka.yml up -d
+```
+
+### Bước 3: Dương & Rùa chạy "Máy lọc" (Nút 2 & 3)
+
+Hai ông cùng vào thư mục `src/processing`, cài thư viện và chạy:
+
+```bash
+pip install -r requirements.txt
+python consumer.py
+```
+
+*Thấy nó đứng im "Waiting for messages..." là ngon lành, đừng lo!*
+
+### Bước 4: HY mở "Bảng tin" (Nút 4)
+
+**HY** trực tiếp thầu Nút 4, vào `src/dashboard`:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+*Nó sẽ hiện ra một cái link Web, mở lên xem cho sướng mắt.*
+
+### Bước 5: Thuận "Khai hỏa" (Nút 1)
+
+Cuối cùng, **Thuận** vào `src/ingestion` và bấm nút:
+
+```bash
+pip install -r requirements.txt
+python producer.py
+```
+
+*Dữ liệu bắt đầu bay vèo vèo từ máy Thuận sang máy Rùa và Dương rồi đó!*
+
+---
+
+## 🛡️ 5. Giai đoạn "Quậy phá" (Thử độ bền hệ thống)
+
+Sau khi hệ thống đã chạy ổn định, anh em mình sẽ cùng làm "Hacker" để thử xem hệ thống có thực sự "bất tử" như quảng cáo không nhé:
+
+### Kịch bản 1: Consumer "Hy sinh" (Lỗi xử lý)
+
+- **Hành động:** **Dương** tắt `consumer.py` ở máy Nút 2 (nhấn `Ctrl+C`).
+- **Quan sát:**
+  1. Check máy **Rùa** (Nút 3), cái Consumer ở đó vẫn phải chạy và nhận dữ liệu bình thường.
+  2. Check **Dashboard** của **HY**, dữ liệu vẫn phải được cập nhật (dù có thể chậm hơn một chút vì mất đi 1 máy xử lý).
+  3. **Kết luận:** Kafka đã tự động điều phối (rebalance) lại để máy của Rùa gánh hết phần việc của Dương.
+
+### Kịch bản 2: Database "Sập nguồn" (Lỗi lưu trữ)
+
+- **Hành động:** **Rùa** tắt con Database chủ lực: `docker stop mongo1`.
+- **Quan sát:**
+  1. Đợi khoảng 10-15 giây. Dashboard có thể hơi lag nhẹ lúc đầu.
+  2. Sau đó, dữ liệu phải tiếp tục hiện lên.
+  3. **Rùa** gõ `docker exec -it mongo2 mongosh --eval "rs.status()"` để xem con nào vừa được bầu làm "Sếp" (Primary) mới.
+  4. **Kết luận:** Cơ chế Replica Set của MongoDB đã cứu nguy, tự bầu sếp mới để hệ thống không bị gián đoạn.
+
+### Kịch bản 3: Kafka "Mất sóng" (Lỗi truyền dẫn - Cực khó)
+
+- **Hành động:** **Thuận** tắt 1 trong 2 Broker Kafka.
+- **Quan sát:**
+  1. Các máy Consumer sẽ báo lỗi kết nối trong vài giây nhưng sau đó sẽ tự kết nối lại vào Broker còn lại.
+  2. Dữ liệu không được mất, chỉ bị chậm lại.
+  3. **Kết luận:** Nhờ có nhiều Broker, hệ thống vẫn duy trì được luồng dữ liệu.
+
+---
+
+**Lời nhắn nhủ từ Trưởng nhóm HY:**
+
+- "Quậy" xong thì nhớ bật lại hết để chụp ảnh làm báo cáo nhé anh em!
+- Lỗi gì thì check cái IP đầu tiên. 90% lỗi là do sai IP.
+- Python thì dùng bản 3.9 trở lên cho chắc.
+- Bí quá thì hú tui ngay, tui hỗ trợ 24/7 (trừ lúc tui ngủ).
+
+**Chúc anh em mình làm Lab điểm cao chót vót! 🚀🔥**
