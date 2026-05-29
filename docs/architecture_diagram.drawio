@@ -1,0 +1,112 @@
+<mxfile host="65bd71144e">
+    <diagram id="video_streaming_analytics" name="System Architecture">
+        <mxGraphModel dx="1278" dy="919" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="1">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="grp_edge" value="Data Sources / Edge Devices" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="113" y="100" width="180" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_web" value="Web Players" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;shadow=1;" parent="grp_edge" vertex="1">
+                    <mxGeometry x="30" y="60" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_mobile" value="Mobile Apps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;shadow=1;" parent="grp_edge" vertex="1">
+                    <mxGeometry x="30" y="120" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_tv" value="Smart TVs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#333333;shadow=1;" parent="grp_edge" vertex="1">
+                    <mxGeometry x="30" y="180" width="120" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_ingestion" value="Ingestion Layer" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="424" y="100" width="180" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_producer" value="Telemetry Producer&#xa;(Python)&#xa;&#xa;[ingestion-service]&#xa;Simulates high-throughput&#xa;telemetry events" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;shadow=1;" parent="grp_ingestion" vertex="1">
+                    <mxGeometry x="15" y="70" width="150" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_broker" value="Event Streaming Platform" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="721" y="60" width="220" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_kafka_cluster" value="Apache Kafka Cluster&#xa;(Broker 1 &amp; Broker 2)&#xa;+ Zookeeper" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#82b366;shadow=1;" parent="grp_broker" vertex="1">
+                    <mxGeometry x="35" y="50" width="150" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_topic1" value="Topic: play_events" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#666666;" parent="grp_broker" vertex="1">
+                    <mxGeometry x="40" y="170" width="140" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_topic2" value="Topic: quality_metrics" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#666666;" parent="grp_broker" vertex="1">
+                    <mxGeometry x="40" y="220" width="140" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_topic3" value="Topic: user_actions" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#666666;" parent="grp_broker" vertex="1">
+                    <mxGeometry x="40" y="270" width="140" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_processing" value="Stream Processing Layer" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="822" y="414" width="180" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_consumer" value="Stream Processor&#xa;(Python)&#xa;&#xa;[processing-service]&#xa;5s Tumbling Windows&#xa;Metrics Aggregation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;shadow=1;" parent="grp_processing" vertex="1">
+                    <mxGeometry x="15" y="70" width="150" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_storage" value="Distributed Storage" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="461" y="414" width="220" height="260" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_mongo" value="MongoDB Replica Set&#xa;(rs0)&#xa;&#xa;- mongo1 (Primary)&#xa;- mongo2 (Sec)&#xa;- mongo3 (Sec)&#xa;&#xa;DB: video_analytics" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffffff;strokeColor=#6c8ebf;shadow=1;" parent="grp_storage" vertex="1">
+                    <mxGeometry x="35" y="60" width="150" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_dashboard" value="Visualization Layer" style="swimlane;whiteSpace=wrap;html=1;startSize=30;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" parent="1" vertex="1">
+                    <mxGeometry x="102" y="434" width="220" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="node_streamlit" value="Interactive Dashboard&#xa;(Streamlit + Plotly)&#xa;&#xa;[dashboard-service]&#xa;Port: 8501" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;shadow=1;" parent="grp_dashboard" vertex="1">
+                    <mxGeometry x="35" y="60" width="150" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" parent="1" source="grp_edge" target="grp_ingestion" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge1_label" value="Events (JSON)&#xa;(play, pause, buffer...)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="edge1" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="-1" y="-20" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeWidth=2;strokeColor=#666666;" parent="1" source="grp_ingestion" target="grp_broker" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge2_label" value="Produce Messages" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="edge2" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="2" y="-17" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#666666;" parent="1" source="grp_broker" target="grp_processing" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1003" y="328"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge3_label" value="Consume Topics&#xa;(Consumer Group)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="edge3" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="51" y="12" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#666666;" parent="1" source="grp_processing" target="grp_storage" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="917" y="550"/>
+                            <mxPoint x="917" y="550"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge4_label" value="Insert Aggregated&#xa;Metrics" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="edge4" vertex="1" connectable="0">
+                    <mxGeometry x="0.1" relative="1" as="geometry">
+                        <mxPoint x="7" y="-25" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#666666;startArrow=classic;endArrow=classic;" parent="1" source="grp_dashboard" target="grp_storage" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge5_label" value="Query Recent Data" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="edge5" vertex="1" connectable="0">
+                    <mxGeometry x="-0.1" relative="1" as="geometry">
+                        <mxPoint x="8" y="-10" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
