@@ -8,11 +8,11 @@
 
 Team mình có 3 Nút (Node), tui chia việc cho **Thuận, Rùa, HY** như sau:
 
-| Thành viên      | Vị trí (Node)  | IP              | Cần cài      | Nhiệm vụ chính                              |
-| :---------------- | :--------------- | :-------------- | :------------- | :--------------------------------------------- |
-| **Thuận**  | **Nút 1** | 10.56.152.94    | Docker, Python | "Đầu não" Kafka & "Máy phát" Producer     |
-| **Rùa**    | **Nút 2** | `10.20.64.69` | Docker, Python | "Kho chứa" MongoDB & "Máy lọc 1" Consumer 1 |
-| **HY**      | **Nút 3** | 10.229.172.19   | Python         | "Bảng tin" Dashboard & "Máy lọc 2" Consumer 2 |
+| Thành viên     | Vị trí (Node)  | IP              | Cần cài      | Nhiệm vụ chính                                |
+| :--------------- | :--------------- | :-------------- | :------------- | :----------------------------------------------- |
+| **Thuận** | **Nút 1** | 10.56.152.94    | Docker, Python | "Đầu não" Kafka & "Máy phát" Producer       |
+| **Rùa**   | **Nút 2** | `10.20.64.69` | Docker, Python | "Kho chứa" MongoDB & "Máy lọc 1" Consumer 1   |
+| **HY**     | **Nút 3** | 10.229.172.19   | Python         | "Bảng tin" Dashboard & "Máy lọc 2" Consumer 2 |
 
 ## ⚙️ 2. Giai đoạn "Khởi động" (Tất cả phải làm)
 
@@ -65,7 +65,7 @@ docker-compose -f deployments/docker-compose.kafka.yml up -d
 Cả hai ông cùng vào thư mục `src/processing`, cài thư viện và chạy:
 
 ```bash
-pip install -r requirements.txt
+
 python consumer.py
 ```
 
