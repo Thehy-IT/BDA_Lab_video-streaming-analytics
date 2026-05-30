@@ -6,18 +6,17 @@
 
 ## 🏗️ 1. Sơ đồ tác chiến (Ai làm việc nấy)
 
-Team mình có 4 Nút (Node), tui chia việc cho **Thuận, Dương, Rùa** như sau:
+Team mình có 3 Nút (Node), tui chia việc cho **Thuận, Rùa, HY** như sau:
 
-| Thành viên      | Vị trí (Node)  | IP                | Cần cài      | Nhiệm vụ chính                              |
-| :---------------- | :--------------- | :---------------- | :------------- | :--------------------------------------------- |
-| **Thuận**  | **Nút 1** | `192.168.1.12`  | Docker, Python | "Đầu não" Kafka & "Máy phát" Producer     |
-| **Dương** | **Nút 2** | `192.168.1.102` | Python         | "Máy lọc 1" Consumer 1                       |
-| **Rùa**    | **Nút 3** | `192.168.1.6`   | Docker, Pthon  | "Kho chứa" MongoDB & "Máy lọc 2" Consumer 2 |
-| **HY**      | **Nút 4** | `192.168.1.104` | Python         | "Bảng tin" Dashboard (Streamlit)              |
+| Thành viên      | Vị trí (Node)  | IP              | Cần cài      | Nhiệm vụ chính                              |
+| :---------------- | :--------------- | :-------------- | :------------- | :--------------------------------------------- |
+| **Thuận**  | **Nút 1** | 10.56.152.94    | Docker, Python | "Đầu não" Kafka & "Máy phát" Producer     |
+| **Rùa**    | **Nút 2** | `10.20.64.69` | Docker, Python | "Kho chứa" MongoDB & "Máy lọc 1" Consumer 1 |
+| **HY**      | **Nút 3** | 10.229.172.19   | Python         | "Bảng tin" Dashboard & "Máy lọc 2" Consumer 2 |
 
 ## ⚙️ 2. Giai đoạn "Khởi động" (Tất cả phải làm)
 
-Trước khi bấm nút, 3 ông làm ngay cho tui mấy việc "thủ tục" này:
+Trước khi bấm nút, anh em làm ngay cho tui mấy việc "thủ tục" này:
 
 1. **Dùng chung 1 Wi-Fi:** Tất cả kết nối vào cùng 1 mạng (tốt nhất là phát từ điện thoại cho ổn định).
 2. **Tắt Firewall:** Windows Firewall là "kẻ thù" của kết nối mạng. Vào *Firewall* chọn *Turn off* hết đi (xong Lab nhớ bật lại không dính virus tui không chịu trách nhiệm đâu nha).
@@ -25,16 +24,16 @@ Trước khi bấm nút, 3 ông làm ngay cho tui mấy việc "thủ tục" nà
 
 ---
 
-## 🛠️ 3. Giai đoạn "Đổ xăng" (Cấu hình .env)
+## 🛠️ 3. Cấu hình .env
 
 Cả team copy file `.env.example` thành `.env`. Sau đó sửa nội dung theo đúng IP máy của **Thuận** và **Rùa**:
 
 ```ini
 # Trỏ về máy của Thuận (Kafka)
-KAFKA_BROKER=192.168.1.101:9092
+KAFKA_BROKER=10.56.152.94:9092
 
 # Trỏ về máy của Rùa (Mongo)
-MONGO_URI=mongodb://192.168.1.103:27017,192.168.1.103:27018,192.168.1.103:27019/?replicaSet=rs0
+MONGO_URI=mongodb://10.20.64.69:27017,10.20.64.69:27018,10.20.64.69:27019/?replicaSet=rs0
 ```
 
 ---
@@ -43,7 +42,7 @@ MONGO_URI=mongodb://192.168.1.103:27017,192.168.1.103:27018,192.168.1.103:27019/
 
 Làm sai thứ tự là nó lỗi "lên bờ xuống ruộng" đó. Anh em cứ thong thả, ông trước xong thì ông sau mới làm.
 
-### Bước 1: Rùa dựng "Kho hàng" (Nút 3)
+### Bước 1: Rùa dựng "Kho hàng" (Nút 2)
 
 **Rùa** mở terminal tại thư mục gốc:
 
@@ -61,9 +60,9 @@ docker-compose -f deployments/docker-compose.mongodb.yml up -d
 docker-compose -f deployments/docker-compose.kafka.yml up -d
 ```
 
-### Bước 3: Dương & Rùa chạy "Máy lọc" (Nút 2 & 3)
+### Bước 3: Rùa & HY chạy "Máy lọc" (Nút 2 & 3)
 
-Hai ông cùng vào thư mục `src/processing`, cài thư viện và chạy:
+Cả hai ông cùng vào thư mục `src/processing`, cài thư viện và chạy:
 
 ```bash
 pip install -r requirements.txt
@@ -72,9 +71,9 @@ python consumer.py
 
 *Thấy nó đứng im "Waiting for messages..." là ngon lành, đừng lo!*
 
-### Bước 4: HY mở "Bảng tin" (Nút 4)
+### Bước 4: HY mở "Bảng tin" (Nút 3)
 
-**HY** trực tiếp thầu Nút 4, vào `src/dashboard`:
+**HY** vào `src/dashboard`:
 
 ```bash
 pip install -r requirements.txt
@@ -92,7 +91,7 @@ pip install -r requirements.txt
 python producer.py
 ```
 
-*Dữ liệu bắt đầu bay vèo vèo từ máy Thuận sang máy Rùa và Dương rồi đó!*
+*Dữ liệu bắt đầu bay vèo vèo từ máy Thuận sang máy Rùa và HY rồi đó!*
 
 ---
 
@@ -102,11 +101,11 @@ Sau khi hệ thống đã chạy ổn định, anh em mình sẽ cùng làm "Hac
 
 ### Kịch bản 1: Consumer "Hy sinh" (Lỗi xử lý)
 
-- **Hành động:** **Dương** tắt `consumer.py` ở máy Nút 2 (nhấn `Ctrl+C`).
+- **Hành động:** **HY** tắt `consumer.py` ở máy Nút 3 (nhấn `Ctrl+C`).
 - **Quan sát:**
-  1. Check máy **Rùa** (Nút 3), cái Consumer ở đó vẫn phải chạy và nhận dữ liệu bình thường.
+  1. Check máy **Rùa** (Nút 2), cái Consumer ở đó vẫn phải chạy và nhận dữ liệu bình thường.
   2. Check **Dashboard** của **HY**, dữ liệu vẫn phải được cập nhật (dù có thể chậm hơn một chút vì mất đi 1 máy xử lý).
-  3. **Kết luận:** Kafka đã tự động điều phối (rebalance) lại để máy của Rùa gánh hết phần việc của Dương.
+  3. **Kết luận:** Kafka đã tự động điều phối (rebalance) lại để máy của Rùa gánh hết phần việc của HY.
 
 ### Kịch bản 2: Database "Sập nguồn" (Lỗi lưu trữ)
 
